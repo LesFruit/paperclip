@@ -11,5 +11,5 @@ jobs:
     with:
       service: paperclip
       port_mapping: '100.77.118.43:3100:3100'
-      health_url: 'http://127.0.0.1:3100/api/health'
+      health_url: 'http://100.77.118.43:3100/api/health'
       extra_volumes: '-v paperclip_data:/paperclip'
