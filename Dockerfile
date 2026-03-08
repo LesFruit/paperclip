@@ -35,6 +35,10 @@ WORKDIR /app
 COPY --from=build /app /app
 RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai
 
+RUN groupadd -r paperclip && useradd -r -g paperclip -m -d /paperclip paperclip \
+  && mkdir -p /paperclip/instances/default \
+  && chown -R paperclip:paperclip /paperclip
+
 ENV NODE_ENV=production \
   HOME=/paperclip \
   HOST=0.0.0.0 \
@@ -49,4 +53,5 @@ ENV NODE_ENV=production \
 VOLUME ["/paperclip"]
 EXPOSE 3100
 
+USER paperclip
 CMD ["node", "--import", "./server/node_modules/tsx/dist/loader.mjs", "server/dist/index.js"]
