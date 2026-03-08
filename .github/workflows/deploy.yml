@@ -2,80 +2,14 @@ name: Deploy Paperclip to Production
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
-env:
-  SERVICE: paperclip
-  DEPLOY_HOST: production-6
-  DEPLOY_KEY: ~/.deploy-keys/production-6
-  SSH_OPTS: -o StrictHostKeyChecking=no
-  HEALTH_URL: http://127.0.0.1:3100/api/health
-
 jobs:
-  build-and-deploy:
-    runs-on: [self-hosted, tailscale-deploy]
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set image tag
-        run: echo "TAG=$(echo ${{ github.sha }} | cut -c1-12)" >> $GITHUB_ENV
-
-      - name: Sync source to production
-        run: |
-          tar czf - --exclude=.git --exclude=node_modules --exclude=.next . | \
-            ssh -i $DEPLOY_KEY $SSH_OPTS $DEPLOY_HOST \
-            "rm -rf /tmp/build-$SERVICE && mkdir -p /tmp/build-$SERVICE && cd /tmp/build-$SERVICE && tar xzf -"
-
-      - name: Build image on production
-        run: |
-          ssh -i $DEPLOY_KEY $SSH_OPTS $DEPLOY_HOST \
-            "cd /tmp/build-$SERVICE && podman build -t $SERVICE:$TAG -f Dockerfile ."
-
-      - name: Deploy container
-        run: |
-          ssh -i $DEPLOY_KEY $SSH_OPTS $DEPLOY_HOST bash <<DEPLOY
-            set -e
-
-            # Stop and remove old container
-            podman stop -t 30 $SERVICE 2>/dev/null || true
-            podman rm $SERVICE 2>/dev/null || true
-
-            # Run new container
-            podman run -d \
-              --name $SERVICE \
-              --restart=always \
-              --env-file ~/deploy/env/$SERVICE.env \
-              -p 3100:3100 \
-              -v paperclip_data:/paperclip \
-              --log-opt max-size=10m \
-              --log-opt max-file=3 \
-              $SERVICE:$TAG
-
-            # Tag as latest
-            podman tag $SERVICE:$TAG $SERVICE:latest
-
-            # Clean up build dir
-            rm -rf /tmp/build-$SERVICE
-
-            # Clean up old images (keep last 3 tags)
-            podman images --format '{{.Tag}}' --filter reference=$SERVICE | \
-              grep -v -E "(latest|$TAG)" | \
-              head -n -2 | \
-              xargs -I{} podman rmi $SERVICE:{} 2>/dev/null || true
-          DEPLOY
-
-      - name: Health check
-        run: |
-          for i in $(seq 1 30); do
-            if ssh -i $DEPLOY_KEY $SSH_OPTS $DEPLOY_HOST "curl -sf $HEALTH_URL" > /dev/null 2>&1; then
-              echo "Health check passed"
-              exit 0
-            fi
-            echo "Waiting for service... ($i/30)"
-            sleep 2
-          done
-          echo "Health check failed!"
-          ssh -i $DEPLOY_KEY $SSH_OPTS $DEPLOY_HOST "podman logs --tail 50 $SERVICE"
-          exit 1
+  deploy:
+    uses: LesFruit/.github/.github/workflows/deploy-to-production.yml@main
+    with:
+      service: paperclip
+      port_mapping: '100.77.118.43:3100:3100'
+      health_url: 'http://127.0.0.1:3100/api/health'
+      extra_volumes: '-v paperclip_data:/paperclip'
