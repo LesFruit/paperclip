@@ -50,11 +50,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          corepack enable
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           pnpm install --frozen-lockfile
 
       - name: Build application
         run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           pnpm --filter @paperclipai/ui build
           pnpm --filter @paperclipai/server build
           test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
