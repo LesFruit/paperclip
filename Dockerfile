@@ -33,10 +33,13 @@ RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" &
 FROM base AS production
 WORKDIR /app
 COPY --from=build /app /app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssh-client python3 \
+  && rm -rf /var/lib/apt/lists/*
 RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai
 
-RUN groupadd -r paperclip && useradd -r -g paperclip -m -d /paperclip paperclip \
-  && mkdir -p /paperclip/instances/default \
+RUN groupadd -r paperclip && useradd -r -g paperclip -m -d /paperclip -s /bin/bash paperclip \
+  && mkdir -p /paperclip/instances/default /paperclip/.ssh \
   && chown -R paperclip:paperclip /paperclip
 
 ENV NODE_ENV=production \
