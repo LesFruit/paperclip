@@ -13,7 +13,7 @@ import { ShieldCheck } from "lucide-react";
 import { ApprovalCard } from "../components/ApprovalCard";
 import { PageSkeleton } from "../components/PageSkeleton";
 
-type StatusFilter = "pending" | "all";
+type StatusFilter = "pending" | "rejected" | "all";
 
 export function Approvals() {
   const { selectedCompanyId } = useCompany();
@@ -22,7 +22,7 @@ export function Approvals() {
   const navigate = useNavigate();
   const location = useLocation();
   const pathSegment = location.pathname.split("/").pop() ?? "pending";
-  const statusFilter: StatusFilter = pathSegment === "all" ? "all" : "pending";
+  const statusFilter: StatusFilter = pathSegment === "rejected" ? "rejected" : pathSegment === "all" ? "all" : "pending";
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,14 +65,20 @@ export function Approvals() {
   });
 
   const filtered = (data ?? [])
-    .filter(
-      (a) => statusFilter === "all" || a.status === "pending" || a.status === "revision_requested",
-    )
+    .filter((a) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "pending") return a.status === "pending" || a.status === "revision_requested";
+      if (statusFilter === "rejected") return a.status === "rejected";
+      return false;
+    })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  const totalCount = (data ?? []).length;
+  const filteredCount = filtered.length;
   const pendingCount = (data ?? []).filter(
     (a) => a.status === "pending" || a.status === "revision_requested",
   ).length;
+  const rejectedCount = (data ?? []).filter((a) => a.status === "rejected").length;
 
   if (!selectedCompanyId) {
     return <p className="text-sm text-muted-foreground">Select a company first.</p>;
@@ -95,9 +101,24 @@ export function Approvals() {
                 {pendingCount}
               </span>
             )}</> },
+            { value: "rejected", label: <>Rejected{rejectedCount > 0 && (
+              <span className={cn(
+                "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                "bg-red-500/20 text-red-500"
+              )}>
+                {rejectedCount}
+              </span>
+            )}</> },
             { value: "all", label: "All" },
           ]} />
         </Tabs>
+        {totalCount > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {statusFilter === "all"
+              ? `Showing ${totalCount} approval${totalCount !== 1 ? "s" : ""}`
+              : `Showing ${filteredCount} of ${totalCount} approvals`}
+          </p>
+        )}
       </div>
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
@@ -107,7 +128,11 @@ export function Approvals() {
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <ShieldCheck className="h-8 w-8 text-muted-foreground/30 mb-3" />
           <p className="text-sm text-muted-foreground">
-            {statusFilter === "pending" ? "No pending approvals." : "No approvals yet."}
+            {statusFilter === "pending"
+              ? "No pending approvals."
+              : statusFilter === "rejected"
+                ? "No rejected approvals."
+                : "No approvals yet."}
           </p>
         </div>
       )}
