@@ -4,12 +4,98 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      force_base_rebuild:
+        description: 'Force base image rebuild'
+        type: boolean
+        default: false
+
+env:
+  SERVICE: paperclip
+  DEPLOY_HOST: production-6
+  DEPLOY_KEY: ~/.deploy-keys/production-6
+  SSH_OPTS: -o StrictHostKeyChecking=no
+  TAILSCALE_IP: '100.77.118.43'
 
 jobs:
   deploy:
-    uses: LesFruit/.github/.github/workflows/deploy-to-production.yml@main
-    with:
-      service: paperclip
-      port_mapping: '100.77.118.43:3100:3100'
-      health_url: 'http://100.77.118.43:3100/api/health'
-      extra_volumes: '-v paperclip_data:/paperclip -v /home/codex/.codex/projects:/home/codex/.codex/projects:ro -v /home/codex/.codex/agent-ssh:/paperclip/.ssh:ro -v /home/codex/.local/bin/gh:/usr/local/bin/gh:ro'
+    runs-on: [self-hosted, tailscale-deploy]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect deploy type
+        id: detect
+        run: |
+          if [[ "${{ inputs.force_base_rebuild }}" == "true" ]]; then
+            echo "type=full" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "Dockerfile.base")
+          if echo "$CHANGED" | grep -qE '^Dockerfile\.base$'; then
+            echo "type=full" >> $GITHUB_OUTPUT
+          else
+            echo "type=code" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build base image (if needed)
+        if: steps.detect.outputs.type == 'full'
+        run: |
+          # Transfer Dockerfile.base and build on production-6
+          scp -i $DEPLOY_KEY $SSH_OPTS Dockerfile.base codex@$TAILSCALE_IP:/tmp/Dockerfile.base
+          ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP \
+            "podman build -t paperclip-base:latest -f /tmp/Dockerfile.base /tmp && rm /tmp/Dockerfile.base"
+
+      - name: Install dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: |
+          pnpm --filter @paperclipai/ui build
+          pnpm --filter @paperclipai/server build
+          test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
+
+      - name: Package and deploy
+        run: |
+          SHA=$(echo ${{ github.sha }} | cut -c1-12)
+
+          # Create tarball with built artifacts + node_modules
+          tar czf /tmp/paperclip-${SHA}.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules/.cache' \
+            --exclude='docs' \
+            --exclude='*.test.*' \
+            --exclude='*.spec.*' \
+            --exclude='media' \
+            .
+
+          # Transfer to production-6
+          scp -i $DEPLOY_KEY $SSH_OPTS \
+            /tmp/paperclip-${SHA}.tar.gz \
+            codex@$TAILSCALE_IP:/tmp/
+
+          # Deploy
+          ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP \
+            "~/deploy/scripts/deploy-code.sh paperclip ${SHA}"
+
+          # Cleanup local tarball
+          rm -f /tmp/paperclip-${SHA}.tar.gz
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            if ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP \
+              "curl -sf --max-time 5 'http://${TAILSCALE_IP}:3100/api/health'" > /dev/null 2>&1; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Waiting for service... ($i/30)"
+            sleep 2
+          done
+          echo "Health check failed!"
+          ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP "podman logs --tail 50 paperclip"
+          exit 1

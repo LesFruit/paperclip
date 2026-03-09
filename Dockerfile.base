@@ -1,0 +1,42 @@
+FROM node:lts-trixie-slim
+
+# System packages for runtime + agent tools
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+     ca-certificates curl git openssh-client python3 \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable
+
+# Global CLI tools for agents
+RUN npm install --global --omit=dev \
+    @anthropic-ai/claude-code@latest \
+    @openai/codex@latest \
+    opencode-ai
+
+# Non-root user
+RUN groupadd -r paperclip \
+  && useradd -r -g paperclip -m -d /paperclip -s /bin/bash paperclip \
+  && mkdir -p /paperclip/instances/default /paperclip/.ssh \
+  && chown -R paperclip:paperclip /paperclip
+
+# /app will be bind-mounted from host
+RUN mkdir -p /app && chown paperclip:paperclip /app
+
+ENV NODE_ENV=production \
+    HOME=/paperclip \
+    HOST=0.0.0.0 \
+    PORT=3100 \
+    SERVE_UI=true \
+    PAPERCLIP_HOME=/paperclip \
+    PAPERCLIP_INSTANCE_ID=default \
+    PAPERCLIP_CONFIG=/paperclip/instances/default/config.json \
+    PAPERCLIP_DEPLOYMENT_MODE=authenticated \
+    PAPERCLIP_DEPLOYMENT_EXPOSURE=private
+
+VOLUME ["/paperclip"]
+EXPOSE 3100
+WORKDIR /app
+USER paperclip
+
+CMD ["node", "--import", "./server/node_modules/tsx/dist/loader.mjs", "server/dist/index.js"]
