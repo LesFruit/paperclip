@@ -230,6 +230,18 @@ pnpm db:migrate       # Apply migrations
 
 See [doc/DEVELOPING.md](doc/DEVELOPING.md) for the full development guide.
 
+### Reliability Ops
+
+```bash
+node scripts/diagnose-blocked-issues.mjs <company-id>        # human-readable report
+node scripts/diagnose-blocked-issues.mjs <company-id> --json # machine-readable report
+```
+
+For standardized agent instructions/context packs (including `AGENTS.md`, `SOUL.md`, `BACKGROUND.md`, and skills), see:
+
+- [docs/guides/agent-developer/agent-profile-pack.md](docs/guides/agent-developer/agent-profile-pack.md)
+- [docs/templates/agent-pack/](docs/templates/agent-pack/)
+
 <br/>
 
 ## Roadmap

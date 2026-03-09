@@ -140,3 +140,16 @@ A change is done when all are true:
 2. Typecheck, tests, and build pass
 3. Contracts are synced across db/shared/server/ui
 4. Docs updated when behavior or commands change
+
+## 11. Agent Profile Pack Convention
+
+For durable agent behavior across adapters, use a profile pack per agent with:
+
+- `AGENTS.md` (operating contract)
+- `SOUL.md` (values and decision style)
+- `BACKGROUND.md` (project/domain memory)
+- `skills/*/SKILL.md` (task procedures)
+- `README.md` (human/operator notes)
+
+Reference guide: `docs/guides/agent-developer/agent-profile-pack.md`
+Templates: `docs/templates/agent-pack/`

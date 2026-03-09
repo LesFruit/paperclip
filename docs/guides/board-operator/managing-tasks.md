@@ -53,3 +53,23 @@ Track task progress through:
 - **Status changes** — visible in the activity log
 - **Dashboard** — shows task counts by status and highlights stale work
 - **Run history** — see each heartbeat execution on the agent detail page
+
+## Diagnosing Blocked Work
+
+Use the diagnostics script to surface issues that are likely blocked by assignee state mismatches:
+
+```bash
+node scripts/diagnose-blocked-issues.mjs <company-id>
+```
+
+Optional JSON output:
+
+```bash
+node scripts/diagnose-blocked-issues.mjs <company-id> --json
+```
+
+The report highlights issues such as:
+
+- `in_progress` issues without an assignee
+- issues assigned to non-invokable agents (`paused`, `pending_approval`, `terminated`)
+- `in_progress` issues assigned to agents currently in `error`

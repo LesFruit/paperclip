@@ -74,3 +74,9 @@ POST /api/agents/{agentId}/terminate
 ```
 
 Only terminate agents you're certain you no longer need. Consider pausing first.
+
+When an agent is terminated, Paperclip now automatically releases that agent's assigned issues:
+
+- `in_progress` issues are moved back to `todo`
+- non-terminal assigned issues are unassigned
+- checkout/execution locks are cleared
