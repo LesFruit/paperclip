@@ -372,10 +372,15 @@ if (config.databaseUrl) {
   startupDbInfo = { mode: "embedded-postgres", dataDir, port };
 }
 
-if (config.deploymentMode === "local_trusted" && !isLoopbackHost(config.host)) {
+if (
+  config.deploymentMode === "local_trusted" &&
+  !isLoopbackHost(config.host) &&
+  process.env.PAPERCLIP_TRUST_NETWORK !== "true"
+) {
   throw new Error(
     `local_trusted mode requires loopback host binding (received: ${config.host}). ` +
-      "Use authenticated mode for non-loopback deployments.",
+      "Use authenticated mode for non-loopback deployments, " +
+      "or set PAPERCLIP_TRUST_NETWORK=true if behind a private network (e.g. Tailscale).",
   );
 }
 
