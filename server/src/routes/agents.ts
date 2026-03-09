@@ -34,7 +34,6 @@ import { redactEventPayload } from "../redaction.js";
 import { runClaudeLogin } from "@paperclipai/adapter-claude-local/server";
 import {
   DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
-  DEFAULT_CODEX_LOCAL_MODEL,
 } from "@paperclipai/adapter-codex-local";
 import { DEFAULT_CURSOR_LOCAL_MODEL } from "@paperclipai/adapter-cursor-local";
 import { ensureOpenCodeModelConfiguredAndAvailable } from "@paperclipai/adapter-opencode-local/server";
@@ -54,6 +53,7 @@ export function agentRoutes(db: Db) {
   const approvalsSvc = approvalService(db);
   const heartbeat = heartbeatService(db);
   const issueApprovalsSvc = issueApprovalService(db);
+  const issuesSvc = issueService(db);
   const secretsSvc = secretService(db);
   const strictSecretsMode = process.env.PAPERCLIP_SECRETS_STRICT_MODE === "true";
 
@@ -221,9 +221,7 @@ export function agentRoutes(db: Db) {
   ): Record<string, unknown> {
     const next = { ...adapterConfig };
     if (adapterType === "codex_local") {
-      if (!asNonEmptyString(next.model)) {
-        next.model = DEFAULT_CODEX_LOCAL_MODEL;
-      }
+      // Let the Codex CLI pick its own default model when none is specified
       const hasBypassFlag =
         typeof next.dangerouslyBypassApprovalsAndSandbox === "boolean" ||
         typeof next.dangerouslyBypassSandbox === "boolean";
@@ -1078,6 +1076,7 @@ export function agentRoutes(db: Db) {
     }
 
     await heartbeat.cancelActiveForAgent(id);
+    const releasedAssignments = await issuesSvc.releaseAssignmentsForAgent(id);
 
     await logActivity(db, {
       companyId: agent.companyId,
@@ -1086,9 +1085,16 @@ export function agentRoutes(db: Db) {
       action: "agent.terminated",
       entityType: "agent",
       entityId: agent.id,
+      details: {
+        releasedAssignmentsCount: releasedAssignments.count,
+        releasedAssignmentIssueIds: releasedAssignments.issueIds,
+      },
     });
 
-    res.json(agent);
+    res.json({
+      ...agent,
+      releasedAssignments,
+    });
   });
 
   router.delete("/agents/:id", async (req, res) => {

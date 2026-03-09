@@ -491,6 +491,9 @@ if (config.heartbeatSchedulerEnabled) {
   void heartbeat.reapOrphanedRuns().catch((err) => {
     logger.error({ err }, "startup reap of orphaned heartbeat runs failed");
   });
+  void heartbeat.clearStaleIssueExecutionLocks().catch((err) => {
+    logger.error({ err }, "startup stale issue execution lock cleanup failed");
+  });
 
   setInterval(() => {
     void heartbeat
@@ -510,6 +513,9 @@ if (config.heartbeatSchedulerEnabled) {
       .catch((err) => {
         logger.error({ err }, "periodic reap of orphaned heartbeat runs failed");
       });
+    void heartbeat.clearStaleIssueExecutionLocks().catch((err) => {
+      logger.error({ err }, "periodic stale issue execution lock cleanup failed");
+    });
   }, config.heartbeatSchedulerIntervalMs);
 }
 

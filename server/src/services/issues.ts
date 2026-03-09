@@ -20,12 +20,24 @@ import { extractProjectMentionIds } from "@paperclipai/shared";
 import { conflict, notFound, unprocessable } from "../errors.js";
 
 const ALL_ISSUE_STATUSES = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
+const NON_ASSIGNABLE_AGENT_STATUSES = new Set(["pending_approval", "terminated", "paused"]);
+const ASSIGNABLE_AGENT_STATUSES = new Set(["active", "idle", "running", "error"]);
 
 function assertTransition(from: string, to: string) {
   if (from === to) return;
   if (!ALL_ISSUE_STATUSES.includes(to)) {
     throw conflict(`Unknown issue status: ${to}`);
   }
+}
+
+export function getAgentAssignmentBlockReason(status: string): string | null {
+  if (NON_ASSIGNABLE_AGENT_STATUSES.has(status)) {
+    return `Cannot assign work to ${status.replace("_", " ")} agents`;
+  }
+  if (!ASSIGNABLE_AGENT_STATUSES.has(status)) {
+    return `Cannot assign work to agents in status '${status}'`;
+  }
+  return null;
 }
 
 function applyStatusSideEffects(
@@ -312,12 +324,8 @@ export function issueService(db: Db) {
     if (assignee.companyId !== companyId) {
       throw unprocessable("Assignee must belong to same company");
     }
-    if (assignee.status === "pending_approval") {
-      throw conflict("Cannot assign work to pending approval agents");
-    }
-    if (assignee.status === "terminated") {
-      throw conflict("Cannot assign work to terminated agents");
-    }
+    const blockReason = getAgentAssignmentBlockReason(assignee.status);
+    if (blockReason) throw conflict(blockReason);
   }
 
   async function assertAssignableUser(companyId: string, userId: string) {
@@ -980,6 +988,46 @@ export function issueService(db: Db) {
       if (!updated) return null;
       const [enriched] = await withIssueLabels(db, [updated]);
       return enriched;
+    },
+
+    releaseAssignmentsForAgent: async (agentId: string) => {
+      const now = new Date();
+      const inProgressReleased = await db
+        .update(issues)
+        .set({
+          status: "todo",
+          assigneeAgentId: null,
+          checkoutRunId: null,
+          executionRunId: null,
+          executionAgentNameKey: null,
+          executionLockedAt: null,
+          updatedAt: now,
+        })
+        .where(and(eq(issues.assigneeAgentId, agentId), eq(issues.status, "in_progress")))
+        .returning({ id: issues.id, status: issues.status });
+
+      const nonInProgressReleased = await db
+        .update(issues)
+        .set({
+          assigneeAgentId: null,
+          checkoutRunId: null,
+          executionRunId: null,
+          executionAgentNameKey: null,
+          executionLockedAt: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(issues.assigneeAgentId, agentId),
+            inArray(issues.status, ["backlog", "todo", "in_review", "blocked"]),
+          ),
+        )
+        .returning({ id: issues.id, status: issues.status });
+
+      return {
+        count: inProgressReleased.length + nonInProgressReleased.length,
+        issueIds: [...inProgressReleased, ...nonInProgressReleased].map((row) => row.id),
+      };
     },
 
     listLabels: (companyId: string) =>

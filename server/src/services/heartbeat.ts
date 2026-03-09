@@ -946,6 +946,49 @@ export function heartbeatService(db: Db) {
     return { reaped: reaped.length, runIds: reaped };
   }
 
+  async function clearStaleIssueExecutionLocks() {
+    const staleLocks = await db
+      .select({
+        issueId: issues.id,
+        companyId: issues.companyId,
+        executionRunId: issues.executionRunId,
+        runStatus: heartbeatRuns.status,
+      })
+      .from(issues)
+      .leftJoin(heartbeatRuns, eq(issues.executionRunId, heartbeatRuns.id))
+      .where(
+        and(
+          sql`${issues.executionRunId} is not null`,
+          sql`(${heartbeatRuns.id} is null or ${heartbeatRuns.status} not in ('queued', 'running'))`,
+        ),
+      );
+
+    if (staleLocks.length === 0) {
+      return { cleared: 0, issueIds: [] as string[] };
+    }
+
+    const issueIds = staleLocks.map((lock) => lock.issueId);
+    await db
+      .update(issues)
+      .set({
+        executionRunId: null,
+        executionAgentNameKey: null,
+        executionLockedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(inArray(issues.id, issueIds));
+
+    logger.warn(
+      {
+        cleared: issueIds.length,
+        issueIds,
+      },
+      "cleared stale issue execution locks",
+    );
+
+    return { cleared: issueIds.length, issueIds };
+  }
+
   async function updateRuntimeState(
     agent: typeof agents.$inferSelect,
     run: typeof heartbeatRuns.$inferSelect,
@@ -2204,6 +2247,8 @@ export function heartbeatService(db: Db) {
     wakeup: enqueueWakeup,
 
     reapOrphanedRuns,
+
+    clearStaleIssueExecutionLocks,
 
     tickTimers: async (now = new Date()) => {
       const allAgents = await db.select().from(agents);
