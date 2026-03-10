@@ -50,15 +50,15 @@ jobs:
 
       - name: Install dependencies
         run: |
+          [ -f "$HOME/.npmrc" ] && grep -q '^prefix=' "$HOME/.npmrc" && sed -i '/^prefix=/d' "$HOME/.npmrc"
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-          NPM_CONFIG_PREFIX="" pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Build application
         run: |
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-          export NPM_CONFIG_PREFIX=""
           pnpm --filter @paperclipai/ui build
           pnpm --filter @paperclipai/server build
           test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
