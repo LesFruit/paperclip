@@ -106,6 +106,15 @@ export {
 } from "./secret.js";
 
 export {
+  createMemorySchema,
+  updateMemorySchema,
+  queryMemoriesSchema,
+  type CreateMemory,
+  type UpdateMemory,
+  type QueryMemories,
+} from "./memory.js";
+
+export {
   createCostEventSchema,
   updateBudgetSchema,
   type CreateCostEvent,

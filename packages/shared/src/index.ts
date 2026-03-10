@@ -229,6 +229,12 @@ export {
   type CompanyPortabilityExport,
   type CompanyPortabilityPreview,
   type CompanyPortabilityImport,
+  createMemorySchema,
+  updateMemorySchema,
+  queryMemoriesSchema,
+  type CreateMemory,
+  type UpdateMemory,
+  type QueryMemories,
 } from "./validators/index.js";
 
 export { API_PREFIX, API } from "./api.js";
