@@ -127,6 +127,21 @@ export {
 } from "./asset.js";
 
 export {
+  createMachineSchema,
+  updateMachineSchema,
+  machineHeartbeatSchema,
+  queryMachinesSchema,
+  MACHINE_ROLES,
+  MACHINE_STATUSES,
+  type CreateMachine,
+  type UpdateMachine,
+  type MachineHeartbeat,
+  type QueryMachines,
+  type MachineRole,
+  type MachineStatus,
+} from "./machine.js";
+
+export {
   createCompanyInviteSchema,
   createOpenClawInvitePromptSchema,
   acceptInviteSchema,

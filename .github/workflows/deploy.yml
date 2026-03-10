@@ -2,7 +2,7 @@ name: Deploy Paperclip to Production
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
     inputs:
       force_base_rebuild:
@@ -69,6 +69,7 @@ jobs:
           # Create tarball with built artifacts + node_modules
           tar czf /tmp/paperclip-${SHA}.tar.gz \
             --exclude='.git' \
+            --exclude='.env' \
             --exclude='node_modules/.cache' \
             --exclude='docs' \
             --exclude='*.test.*' \

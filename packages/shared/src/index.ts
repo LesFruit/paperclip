@@ -235,6 +235,18 @@ export {
   type CreateMemory,
   type UpdateMemory,
   type QueryMemories,
+  createMachineSchema,
+  updateMachineSchema,
+  machineHeartbeatSchema,
+  queryMachinesSchema,
+  MACHINE_ROLES,
+  MACHINE_STATUSES,
+  type CreateMachine,
+  type UpdateMachine,
+  type MachineHeartbeat,
+  type QueryMachines,
+  type MachineRole,
+  type MachineStatus,
 } from "./validators/index.js";
 
 export { API_PREFIX, API } from "./api.js";

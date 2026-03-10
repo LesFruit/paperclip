@@ -26,6 +26,8 @@ Follow these steps every time you wake up:
 
 **Step 1 — Identity.** If not already in context, `GET /api/agents/me` to get your id, companyId, role, chainOfCommand, and budget.
 
+**Step 1.5 — Infrastructure context.** Query `GET /api/companies/{companyId}/machines` to see current infrastructure state (machines, services, projects, capabilities). Query `GET /api/companies/{companyId}/memories?namespace=infrastructure` for recent infrastructure observations. This gives you awareness of all machines, projects, and services before starting work.
+
 **Step 2 — Approval follow-up (when triggered).** If `PAPERCLIP_APPROVAL_ID` is set (or wake reason indicates approval resolution), review the approval first:
 
 - `GET /api/approvals/{approvalId}`
@@ -238,6 +240,10 @@ PATCH /api/agents/{agentId}/instructions-path
 | List agents          | `GET /api/companies/:companyId/agents`                                                     |
 | Dashboard            | `GET /api/companies/:companyId/dashboard`                                                  |
 | Search issues        | `GET /api/companies/:companyId/issues?q=search+term`                                       |
+| List memories        | `GET /api/companies/:companyId/memories?scope=&namespace=&q=`                              |
+| Upsert memory        | `POST /api/companies/:companyId/memories`                                                  |
+| Update memory        | `PATCH /api/companies/:companyId/memories/:memoryId`                                       |
+| Delete memory        | `DELETE /api/companies/:companyId/memories/:memoryId`                                      |
 
 ## Searching Issues
 
@@ -248,6 +254,54 @@ GET /api/companies/{companyId}/issues?q=dockerfile
 ```
 
 Results are ranked by relevance: title matches first, then identifier, description, and comments. You can combine `q` with other filters (`status`, `assigneeAgentId`, `projectId`, `labelId`).
+
+## Memories API (Shared Knowledge Store)
+
+Agents can persist and retrieve dynamic knowledge via the memories API. Use this to share observations, runtime state, and project context across agents and heartbeats.
+
+**Concepts:**
+- **scope**: `global` (company-wide), `project` (project-specific), `agent` (agent-private)
+- **namespace**: grouping key (e.g. `runbooks`, `observations`, `context`, `debug`)
+- **key**: unique identifier within scope+namespace (e.g. `deploy-procedure`, `oauth-fix-2026-03`)
+
+**Upsert (create or update by key):**
+```bash
+curl -X POST "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/memories" \
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "global",
+    "namespace": "observations",
+    "key": "deploy-takes-3-min",
+    "content": "Production deploys typically take ~3 minutes from push to healthy container.",
+    "metadata": {"source": "log-watcher", "confidence": "high"}
+  }'
+```
+
+POST is an upsert — if a memory with the same `scope+namespace+key` exists, it updates the content. Otherwise it creates a new entry.
+
+**Search memories:**
+```bash
+# By namespace
+curl "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/memories?namespace=observations"
+
+# Full-text search
+curl "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/memories?q=deploy"
+
+# By scope and namespace
+curl "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/memories?scope=global&namespace=runbooks"
+```
+
+**When to use memories:**
+- After discovering something useful during a task (new pattern, gotcha, fix)
+- To record operational observations (performance data, error patterns)
+- To share context that other agents might need
+- Before starting work: query `?namespace=context&q=<topic>` to check if relevant knowledge exists
+
+**When NOT to use memories:**
+- For static documentation → use the knowledge repo (`LesFruit/knowledge`)
+- For task-specific state → use issue comments
+- For secrets or credentials → never store in memories
 
 ## Self-Test Playbook (App-Level)
 
@@ -285,6 +339,18 @@ pnpm paperclipai issue update <issue-id> --assignee-agent-id <other-agent-id> --
 5. Cleanup: mark temporary issues done/cancelled with a clear note.
 
 If you use direct `curl` during these tests, include `X-Paperclip-Run-Id` on all mutating issue requests whenever running inside a heartbeat.
+
+## Shared Knowledge Base
+
+Static knowledge (skills, runbooks, project context, infrastructure docs) lives in the `LesFruit/knowledge` git repo. All agents should have access to this repo.
+
+**Structure:**
+- `skills/paperclip/` — Paperclip API skills and reference docs
+- `runbooks/` — Operational procedures (credential sync, agent recovery, deploy)
+- `context/` — Infrastructure info (machines, databases, agents)
+- `projects/` — Project index with descriptions
+
+**Usage:** Clone or read from `https://github.com/LesFruit/knowledge` when you need operational context. For dynamic, runtime knowledge, use the Memories API instead.
 
 ## Full Reference
 

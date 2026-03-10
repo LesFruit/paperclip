@@ -190,6 +190,13 @@
       "when": 1773103185417,
       "tag": "0026_sad_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1773106674003,
+      "tag": "0027_demonic_ender_wiggin",
+      "breakpoints": true
     }
   ]
 }
