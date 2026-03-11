@@ -115,18 +115,21 @@ jobs:
           fi
 
           # Check if kimi is already in the container
-          if ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP \
-            "podman exec paperclip kimi --version" > /dev/null 2>&1; then
-            echo "kimi-cli already installed in container"
+          KIMI_OK=$(ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP \
+            "podman exec paperclip kimi --version 2>/dev/null" || true)
+          if [ -n "$KIMI_OK" ]; then
+            echo "kimi-cli already installed in container: $KIMI_OK"
             exit 0
           fi
+          echo "kimi-cli not found in container, installing..."
 
           # Transfer and install in running container
           tar czf /tmp/kimi-cli-venv.tar.gz -C "$(dirname $KIMI_VENV)" kimi-cli/
           scp -i $DEPLOY_KEY $SSH_OPTS /tmp/kimi-cli-venv.tar.gz codex@$TAILSCALE_IP:/tmp/
           ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP "
+            podman cp /tmp/kimi-cli-venv.tar.gz paperclip:/tmp/
             podman exec --user root paperclip bash -c '
-              mkdir -p /opt && cd /opt && tar xzf /tmp/kimi-cli-venv.tar.gz
+              mkdir -p /opt && cd /opt && tar xzf /tmp/kimi-cli-venv.tar.gz && rm -f /tmp/kimi-cli-venv.tar.gz
               ln -sf /usr/bin/python3 /opt/kimi-cli/bin/python
               for f in kimi kimi-cli; do
                 [ -f /opt/kimi-cli/bin/\$f ] && sed -i \"1s|.*|#!/opt/kimi-cli/bin/python|\" /opt/kimi-cli/bin/\$f
