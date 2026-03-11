@@ -14,6 +14,12 @@ RUN npm install --global --omit=dev \
     @openai/codex@latest \
     opencode-ai
 
+# Kimi Code CLI (Python-based agent)
+RUN python3 -m venv /opt/kimi-cli \
+  && /opt/kimi-cli/bin/pip install --no-cache-dir kimi-cli \
+  && ln -sf /opt/kimi-cli/bin/kimi /usr/local/bin/kimi \
+  && ln -sf /opt/kimi-cli/bin/kimi-cli /usr/local/bin/kimi-cli
+
 # Non-root user
 RUN groupadd -r paperclip \
   && useradd -r -g paperclip -m -d /paperclip -s /bin/bash paperclip \
