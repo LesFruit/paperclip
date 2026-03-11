@@ -45,6 +45,18 @@ import {
 import {
   agentConfigurationDoc as piAgentConfigurationDoc,
 } from "@paperclipai/adapter-pi-local";
+import {
+  execute as kimiExecute,
+  testEnvironment as kimiTestEnvironment,
+  sessionCodec as kimiSessionCodec,
+} from "@paperclipai/adapter-kimi-local/server";
+import { agentConfigurationDoc as kimiAgentConfigurationDoc, models as kimiModels } from "@paperclipai/adapter-kimi-local";
+import {
+  execute as minimaxExecute,
+  testEnvironment as minimaxTestEnvironment,
+  sessionCodec as minimaxSessionCodec,
+} from "@paperclipai/adapter-minimax-local/server";
+import { agentConfigurationDoc as minimaxAgentConfigurationDoc, models as minimaxModels } from "@paperclipai/adapter-minimax-local";
 import { processAdapter } from "./process/index.js";
 import { httpAdapter } from "./http/index.js";
 
@@ -111,6 +123,26 @@ const piLocalAdapter: ServerAdapterModule = {
   agentConfigurationDoc: piAgentConfigurationDoc,
 };
 
+const kimiLocalAdapter: ServerAdapterModule = {
+  type: "kimi_local",
+  execute: kimiExecute,
+  testEnvironment: kimiTestEnvironment,
+  sessionCodec: kimiSessionCodec,
+  models: kimiModels,
+  supportsLocalAgentJwt: true,
+  agentConfigurationDoc: kimiAgentConfigurationDoc,
+};
+
+const minimaxLocalAdapter: ServerAdapterModule = {
+  type: "minimax_local",
+  execute: minimaxExecute,
+  testEnvironment: minimaxTestEnvironment,
+  sessionCodec: minimaxSessionCodec,
+  models: minimaxModels,
+  supportsLocalAgentJwt: true,
+  agentConfigurationDoc: minimaxAgentConfigurationDoc,
+};
+
 const adaptersByType = new Map<string, ServerAdapterModule>(
   [
     claudeLocalAdapter,
@@ -119,6 +151,8 @@ const adaptersByType = new Map<string, ServerAdapterModule>(
     piLocalAdapter,
     cursorLocalAdapter,
     openclawGatewayAdapter,
+    kimiLocalAdapter,
+    minimaxLocalAdapter,
     processAdapter,
     httpAdapter,
   ].map((a) => [a.type, a]),
