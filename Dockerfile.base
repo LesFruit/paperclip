@@ -14,11 +14,10 @@ RUN npm install --global --omit=dev \
     @openai/codex@latest \
     opencode-ai
 
-# Kimi Code CLI (Python-based agent)
-RUN python3 -m venv /opt/kimi-cli \
-  && /opt/kimi-cli/bin/pip install --no-cache-dir kimi-cli \
-  && ln -sf /opt/kimi-cli/bin/kimi /usr/local/bin/kimi \
-  && ln -sf /opt/kimi-cli/bin/kimi-cli /usr/local/bin/kimi-cli
+# Kimi Code CLI (Python-based agent) — installed from pre-built venv
+# The venv is transferred to /opt/kimi-cli during deploy and symlinked.
+# To update: run `uv tool install kimi-cli` on main-dev-2, tar the venv,
+# scp to production, and extract to /opt/kimi-cli inside the container.
 
 # Non-root user
 RUN groupadd -r paperclip \

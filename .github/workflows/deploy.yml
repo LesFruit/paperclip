@@ -48,6 +48,34 @@ jobs:
           ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP \
             "podman build -t paperclip-base:latest -f /tmp/Dockerfile.base /tmp && rm /tmp/Dockerfile.base"
 
+      - name: Install kimi-cli in container
+        if: steps.detect.outputs.type == 'full'
+        run: |
+          # Build kimi-cli venv locally (main-dev-2 has internet access)
+          export PATH="$HOME/.local/bin:$PATH"
+          KIMI_VENV="$HOME/.local/share/uv/tools/kimi-cli"
+          if [ ! -d "$KIMI_VENV" ]; then
+            uv tool install --python 3.13 kimi-cli
+          fi
+          tar czf /tmp/kimi-cli-venv.tar.gz -C "$(dirname $KIMI_VENV)" kimi-cli/
+
+          # Transfer and install in running container
+          scp -i $DEPLOY_KEY $SSH_OPTS /tmp/kimi-cli-venv.tar.gz codex@$TAILSCALE_IP:/tmp/
+          ssh -i $DEPLOY_KEY $SSH_OPTS codex@$TAILSCALE_IP "
+            podman exec --user root paperclip bash -c '
+              mkdir -p /opt && cd /opt && tar xzf /tmp/kimi-cli-venv.tar.gz
+              ln -sf /usr/bin/python3 /opt/kimi-cli/bin/python
+              for f in kimi kimi-cli; do
+                [ -f /opt/kimi-cli/bin/\$f ] && sed -i \"1s|.*|#!/opt/kimi-cli/bin/python|\" /opt/kimi-cli/bin/\$f
+              done
+              sed -i \"s|home = .*|home = /usr/bin|\" /opt/kimi-cli/pyvenv.cfg
+              ln -sf /opt/kimi-cli/bin/kimi /usr/local/bin/kimi
+              ln -sf /opt/kimi-cli/bin/kimi-cli /usr/local/bin/kimi-cli
+            '
+            podman exec paperclip kimi --version
+          "
+          rm -f /tmp/kimi-cli-venv.tar.gz
+
       - name: Install dependencies
         run: |
           [ -f "$HOME/.npmrc" ] && grep -q '^prefix=' "$HOME/.npmrc" && sed -i '/^prefix=/d' "$HOME/.npmrc"
